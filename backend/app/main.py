@@ -1,16 +1,20 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.database import engine, Base
+from app.models import user, service, email, user_service
+
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI(
     title="Mai1 Security Service",
     description="이메일 분석을 통한 가입 서비스 보안 평가 서비스",
     version="1.0.0"
 )
 
-# CORS 설정 (프론트엔드 연동을 위해 필수)
 origins = [
-    "http://localhost:3000", # React 기본 포트
-    "*" # 해커톤 편의상 전체 허용 (배포 시 수정 필요)
+    "http://localhost:3000",
+    "*"
 ]
 
 app.add_middleware(
