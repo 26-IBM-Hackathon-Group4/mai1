@@ -151,6 +151,8 @@ backend/__pycache__/
 
 # secret files
 backend/secret_db.json
+backend/secret_credentials.json
+backend/token.json
 
 # Spyder project settings
 .spyderproject

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.api import api_router
 from app.core.database import engine, Base
 from app.models import user, service, email, user_service
 
@@ -28,3 +29,5 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {"status": "success", "message": "Mai1 API Server is running!"}
+
+app.include_router(api_router, prefix="/api")
