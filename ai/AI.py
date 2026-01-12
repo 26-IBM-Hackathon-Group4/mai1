@@ -1,17 +1,25 @@
 import requests
 import json
 import os
-from dotenv import load_dotenv
 import pandas as pd
 
-# 1️⃣ .env 파일 불러오기 (프로세스 전체에서 사용 가능)
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SECRET_PATH = os.path.join(BASE_DIR, '../backend/secret_ibm.json')
+
+try:
+    with open(SECRET_PATH, 'r', encoding='utf-8') as f:
+        secrets = json.load(f)
+except FileNotFoundError:
+    print(f"Error: {SECRET_PATH} not found.")
+    secrets = {}
+
+API_KEY = secrets.get("API_KEY", "")
+SERVICE_URL = secrets.get("SERVICE_URL", "")
+classifier_AGENT_ID = secrets.get("classifier_AGENT_ID", "")
+Privacy_AGENT_ID = secrets.get("Privacy_AGENT_ID", "")
+CHECKLIST_TITLES = secrets.get("CHECKLIST_TITLES", [])
 
 def classifier(input_data):
-
-    API_KEY = os.getenv("API_KEY")
-    SERVICE_URL = os.getenv("SERVICE_URL")
-    AGENT_ID = os.getenv("Classifier_AGENT_ID")
 
     # IAM 토큰 발급
     token = requests.post(
@@ -28,7 +36,7 @@ def classifier(input_data):
 
     # Watson Orchestrate 호출
     res = requests.post(
-        f"{SERVICE_URL.rstrip('/')}/v1/orchestrate/{AGENT_ID}/chat/completions",
+        f"{SERVICE_URL.rstrip('/')}/v1/orchestrate/{classifier_AGENT_ID}/chat/completions",
         headers={
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
@@ -62,12 +70,6 @@ def call_classifier(input_data):
 
 
 def analyze_privacy(path,name):
-    
-
-    # 2️⃣ 환경변수 불러오기
-    API_KEY = os.getenv("API_KEY")
-    SERVICE_URL = os.getenv("SERVICE_URL")
-    AGENT_ID = os.getenv("Privacy_AGENT_ID")
 
     # 3️⃣ IAM 토큰 발급
     token = requests.post(
@@ -88,7 +90,7 @@ def analyze_privacy(path,name):
 
     # 5️⃣ Watson Orchestrate 호출
     res = requests.post(
-        f"{SERVICE_URL.rstrip('/')}/v1/orchestrate/{AGENT_ID}/chat/completions",
+        f"{SERVICE_URL.rstrip('/')}/v1/orchestrate/{Privacy_AGENT_ID}/chat/completions",
         headers={
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",

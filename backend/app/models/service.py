@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy import Column, Integer, String, DateTime, Text, Float
 from app.core.database import Base
 from sqlalchemy.orm import relationship
 
@@ -9,6 +9,9 @@ class Service(Base):
     service_name = Column(String(100), nullable=False)
     domain = Column(String(255), index=True)
     risk_level = Column(String(10), nullable=True)
+    security_score = Column(Float, nullable=True)
+    security_report = Column(Text, nullable=True)
+    
     evaluated_at = Column(DateTime, nullable=True)
 
     user_services = relationship("UserService", back_populates="service")

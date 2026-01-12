@@ -9,6 +9,8 @@ class ServiceEvaluationResponse(BaseModel):
     service_id: int
     service_name: str
     new_risk_level: str
+    security_score: float
+    security_report: str
     evaluated_at: datetime
 
 class AdminServiceResponse(BaseModel):
@@ -16,6 +18,7 @@ class AdminServiceResponse(BaseModel):
     service_name: str
     domain: Optional[str] = None
     risk_level: Optional[str] = None
+    security_score: Optional[float] = None
     evaluated_at: Optional[datetime] = None
 
     class Config:
@@ -24,7 +27,7 @@ class AdminServiceResponse(BaseModel):
 class AdminServiceListResponse(BaseModel):
     total_count: int
     services: List[AdminServiceResponse]
-    
+
 class UserCreate(BaseModel):
     email: EmailStr
     nickname: Optional[str] = None

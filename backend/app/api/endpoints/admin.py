@@ -1,3 +1,5 @@
+import os
+import shutil
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Form
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -5,23 +7,25 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.models.service import Service
+from app.models.user import User
 from app.schemas.common import CommonResponse
 from app.schemas.admin import (
     AdminServiceListResponse, 
     AdminServiceResponse, 
     ServiceUpdate, 
-    ServiceEvaluationResponse
-)
-
-from app.models.user import User
-from app.schemas.admin import (
+    ServiceEvaluationResponse,
     AdminUserListResponse,
     AdminUserResponse,
     UserCreate,
     UserUpdate
 )
+from app.services.ai_service import ai_service
 
 router = APIRouter()
+
+# 임시 파일 저장 경로
+TEMP_DIR = "temp_files"
+os.makedirs(TEMP_DIR, exist_ok=True)
 
 @router.get("/services", response_model=CommonResponse[AdminServiceListResponse])
 def get_admin_services(
@@ -80,34 +84,75 @@ async def evaluate_service(
     file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db)
 ):
+    # print(f"DEBUG: service_id={service_id}, type={type}, file={file}, content={content}")
+
     service = db.query(Service).filter(Service.service_id == service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Service not found")
-    
-    # [임시 로직]
-    ai_risk_score = "B" 
-    if type == "FILE" and file:
-        print(f"Analyzing file: {file.filename}")
-        ai_risk_score = "A"
-    elif type == "TEXT" and content:
-        print(f"Analyzing text: {content[:20]}...")
-        ai_risk_score = "C"
-    
-    service.risk_level = ai_risk_score
-    service.evaluated_at = datetime.now()
-    db.commit()
 
-    return {
-        "status": "success",
-        "message": "AI 평가가 완료되었습니다.",
-        "data": {
-            "service_id": service.service_id,
-            "service_name": service.service_name,
-            "new_risk_level": ai_risk_score,
-            "evaluated_at": service.evaluated_at
-        }
-    }
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    temp_filename = f"{service.service_name}_{timestamp}.txt"
+    temp_file_path = os.path.join(TEMP_DIR, temp_filename)
+
+    input_type = type.upper()
+    is_valid_input = False
+
+    if input_type == "FILE" and file:
+        is_valid_input = True
+    elif input_type == "TEXT" and content:
+        is_valid_input = True
     
+    if not is_valid_input:
+        error_msg = f"입력 조건 불만족: type={type} (기대: FILE/TEXT), file여부={bool(file)}, content여부={bool(content)}"
+        print(f"{error_msg}")
+        raise HTTPException(status_code=400, detail=error_msg)
+
+    try:
+        if input_type == "FILE":
+            with open(temp_file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        
+        elif input_type == "TEXT":
+            with open(temp_file_path, "w", encoding="utf-8") as buffer:
+                buffer.write(content)
+
+        print(f"Calling AI Evaluation for file: {temp_file_path}")
+        eval_result = ai_service.evaluate_service_security(temp_file_path, service.service_name)
+        
+        service.risk_level = eval_result["grade"]
+        service.security_score = eval_result["score"]
+        service.security_report = eval_result["report"]
+        service.evaluated_at = datetime.now()
+        
+        db.commit()
+
+        return {
+            "status": "success",
+            "message": "AI 보안 평가가 완료되었습니다.",
+            "data": {
+                "service_id": service.service_id,
+                "service_name": service.service_name,
+                "new_risk_level": service.risk_level,
+                "security_score": service.security_score,
+                "security_report": service.security_report,
+                "evaluated_at": service.evaluated_at
+            }
+        }
+
+    except Exception as e:
+        print(f"Evaluation Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"평가 실패: {str(e)}")
+    
+    finally:
+        if os.path.exists(temp_file_path):
+            try:
+                os.remove(temp_file_path)
+                print(f"🗑️ Removed temp file: {temp_file_path}")
+            except Exception as e:
+                print(f"⚠️ Failed to remove temp file: {e}")
+
 @router.get("/users", response_model=CommonResponse[AdminUserListResponse])
 def get_all_users(
     skip: int = 0,
