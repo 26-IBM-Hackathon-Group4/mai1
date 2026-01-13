@@ -16,8 +16,8 @@ class EmailCreate(EmailBase):
 
 class EmailResponse(EmailBase):
     email_id: int
-    provider: str
-    classification: str
+    provider: Optional[str] = None
+    classification: Optional[str] = None
 
     class Config:
         from_attributes = True
