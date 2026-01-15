@@ -9,7 +9,7 @@ import { useEmailContext } from "@/lib/email-context"
 import { cn } from "@/lib/utils"
 
 export function ServiceTable() {
-  const { discoveredServices } = useEmailContext()
+  const { discoveredServices, selectService } = useEmailContext() // [수정] selectService 가져오기
 
   return (
     <Card className="flex-1 bg-white border-slate-200">
@@ -33,8 +33,15 @@ export function ServiceTable() {
               <TableRow><TableCell colSpan={4} className="h-24 text-center text-slate-500">가입된 서비스가 없습니다.</TableCell></TableRow>
             ) : (
               discoveredServices.map((service) => (
-                <TableRow key={service.user_service_id}>
-                  <TableCell className="font-medium text-slate-900">{service.service_name}</TableCell>
+                <TableRow 
+                  key={service.user_service_id}
+                  // [추가] 클릭 시 상세 페이지로 이동 (커서 포인터 추가)
+                  className="cursor-pointer hover:bg-slate-50 transition-colors"
+                  onClick={() => selectService(service)}
+                >
+                  <TableCell className="font-medium text-indigo-600 hover:underline">
+                    {service.service_name}
+                  </TableCell>
                   <TableCell className="text-slate-500">{service.domain || "-"}</TableCell>
                   <TableCell className="text-slate-500">
                     {service.subscription_date ? new Date(service.subscription_date).toLocaleDateString() : "-"}
