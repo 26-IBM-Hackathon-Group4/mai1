@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import re
 import shutil
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -24,7 +25,7 @@ class AIService:
         """
         1. AI로 메일 분류
         2. Emails 테이블에 classification 결과 업데이트
-        3. 'REGISTER'인 경우 발송자 도메인과 Services 테이블 매칭
+        3. 'REGISTER'인 경우 발송자 도메인과 Services 테이블 매칭 (없으면 생성)
         4. 매칭되면 UserServices 테이블에 관계 생성
         """
 
@@ -72,35 +73,62 @@ class AIService:
         return final_results
 
     def _link_user_to_service(self, db: Session, email: Email):
+        """
+        이메일 발신자 도메인을 분석하여 서비스와 연결합니다.
+        서비스가 없으면 새로 생성합니다.
+        """
         sender_email = email.sender
         if not sender_email or "@" not in sender_email:
             return
 
-        domain_part = sender_email.split("@")[1].lower()
-        matched_service = db.query(Service).filter(Service.domain != None).all()
+        domain_match = re.search(r"@([\w.-]+)", sender_email)
+        if not domain_match:
+            return
         
-        target_service = None
-        for service in matched_service:
-            if service.domain in domain_part:
-                target_service = service
+        full_domain = domain_match.group(1).lower()
+        
+        matched_service = None
+        
+        all_services = db.query(Service).filter(Service.domain != None).all()
+        for service in all_services:
+            if service.domain in full_domain:
+                matched_service = service
                 break
-        
-        if target_service:
+
+        if not matched_service:
+            print(f"🆕 새로운 서비스 발견! 자동 등록 시도: {full_domain}")
+            
+            inferred_name = full_domain.split('.')[0].capitalize()
+            
+            new_service = Service(
+                service_name=inferred_name,
+                domain=full_domain,
+                risk_level="B"
+            )
+            db.add(new_service)
+            db.commit()
+            db.refresh(new_service)
+            matched_service = new_service
+
+        if matched_service:
             existing_link = db.query(UserService).filter(
                 UserService.user_id == email.user_id,
-                UserService.service_id == target_service.service_id
+                UserService.service_id == matched_service.service_id
             ).first()
 
             if not existing_link:
                 new_link = UserService(
                     user_id=email.user_id,
-                    service_id=target_service.service_id,
+                    service_id=matched_service.service_id,
                     email_id=email.email_id,
                     subscription_date=email.received_at.date() if email.received_at else datetime.now().date(),
                     status="Active"
                 )
                 db.add(new_link)
-                print(f"[매칭 성공] {email.user_id}번 유저 -> {target_service.service_name} 서비스 연결됨")
+                db.commit()
+                print(f"[매칭 성공] {email.user_id}번 유저 -> {matched_service.service_name} 서비스 연결됨")
+            else:
+                print(f"[중복] 이미 연결된 서비스: {matched_service.service_name}")
 
     def evaluate_service_security(self, file_path: str, service_name: str):
         """
