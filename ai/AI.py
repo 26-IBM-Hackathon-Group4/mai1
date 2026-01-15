@@ -138,7 +138,10 @@ def call_privacy_evaluate(path, name):
 
     df = pd.DataFrame(rows).set_index("항목")
 
-    df['항목 이름'] = CHECKLIST_TITLES
+    checklist_env = CHECKLIST_TITLES
+    checklist_titles = [x.strip() for x in checklist_env.split(",") if x.strip()]
+
+    df['항목 이름'] = checklist_titles
 
     df['P/F'] = df['P/F'].replace({"PASS": 1, "FAIL": 0, "N/A": 0.5}).astype(float)
 
